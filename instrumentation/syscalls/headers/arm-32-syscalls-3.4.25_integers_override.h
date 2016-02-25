@@ -30,30 +30,46 @@
 
 #endif
 
-#define OVERRIDE_TABLE_32_arm_fadvise64_64
-#define OVERRIDE_TABLE_32_sync_file_range2
-
 #ifndef CREATE_SYSCALL_TABLE
 
+#define OVERRIDE_32_arm_fadvise64_64
 SC_LTTNG_TRACEPOINT_EVENT(arm_fadvise64_64,
-	TP_PROTO(int fd, int advice, loff_t offset, loff_t len),
-	TP_ARGS(fd, advice, offset, len),
-	TP_FIELDS(
-		ctf_integer_hex(int, fd, fd)
-		ctf_integer_hex(int, advice, advice)
-		ctf_integer_hex(loff_t, offset, offset)
-		ctf_integer_hex(loff_t, len, len)
+	TP_PROTO(sc_exit(ret,) int fd, int advice, loff_t offset, loff_t len),
+	TP_ARGS(sc_exit(ret,) fd, advice, offset, len),
+	TP_FIELDS(sc_exit(ctf_integer(long, ret, ret))
+		sc_in(ctf_integer_hex(int, fd, fd))
+		sc_in(ctf_integer_hex(int, advice, advice))
+		sc_in(ctf_integer_hex(loff_t, offset, offset))
+		sc_in(ctf_integer_hex(loff_t, len, len))
 	)
 )
 
+#define OVERRIDE_32_sync_file_range2
 SC_LTTNG_TRACEPOINT_EVENT(sync_file_range2,
-	TP_PROTO(int fd, loff_t offset, loff_t nbytes, unsigned int flags),
-	TP_ARGS(fd, offset, nbytes, flags),
-	TP_FIELDS(
-		ctf_integer_hex(int, fd, fd)
-		ctf_integer_hex(loff_t, offset, offset)
-		ctf_integer_hex(loff_t, nbytes, nbytes)
-		ctf_integer_hex(unsigned int, flags, flags)
+	TP_PROTO(sc_exit(ret,) int fd, loff_t offset, loff_t nbytes, unsigned int flags),
+	TP_ARGS(sc_exit(ret,) fd, offset, nbytes, flags),
+	TP_FIELDS(sc_exit(ctf_integer(long, ret, ret))
+		sc_in(ctf_integer_hex(int, fd, fd))
+		sc_in(ctf_integer_hex(loff_t, offset, offset))
+		sc_in(ctf_integer_hex(loff_t, nbytes, nbytes))
+		sc_in(ctf_integer_hex(unsigned int, flags, flags))
+	)
+)
+
+#define OVERRIDE_32_mmap2
+SC_LTTNG_TRACEPOINT_EVENT(mmap2,
+	TP_PROTO(sc_exit(long ret,)
+		unsigned long addr, unsigned long len,
+		unsigned long prot, unsigned long flags,
+		unsigned long fd, unsigned long pgoff),
+	TP_ARGS(sc_exit(ret,) addr, len, prot, flags, fd, pgoff),
+	TP_FIELDS(sc_exit(ctf_integer(long, ret, ret))
+		sc_in(ctf_integer_hex(unsigned long, addr, addr))
+		sc_in(ctf_integer(size_t, len, len))
+		sc_in(ctf_integer(int, prot, prot))
+		sc_in(ctf_integer(int, flags, flags))
+		sc_in(ctf_integer(int, fd, fd))
+		sc_in(ctf_integer(off_t, pgoff, pgoff))
 	)
 )
 
@@ -61,7 +77,8 @@ SC_LTTNG_TRACEPOINT_EVENT(sync_file_range2,
 
 #define OVERRIDE_TABLE_32_mmap
 TRACE_SYSCALL_TABLE(mmap, mmap, 90, 6)
-
+#define OVERRIDE_TABLE_32_mmap2
+TRACE_SYSCALL_TABLE(mmap2, mmap2, 192, 6)
 #define OVERRIDE_TABLE_32_arm_fadvise64_64
 TRACE_SYSCALL_TABLE(arm_fadvise64_64, arm_fadvise64_64, 270, 4)
 #define OVERRIDE_TABLE_32_sync_file_range2
