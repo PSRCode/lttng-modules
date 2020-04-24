@@ -119,6 +119,9 @@ ssize_t vfs_lib_ring_buffer_splice_read(struct file *in, loff_t *ppos,
 /* Flush the current sub-buffer, even if empty. */
 #define RING_BUFFER_FLUSH_EMPTY			_IO(0xF6, 0x0F)
 
+/* Is metadata incomplete ? */
+#define RING_BUFFER_METADATA_INCOMPLETE		_IO(0xF6, 0x12)
+
 #ifdef CONFIG_COMPAT
 /* Get a snapshot of the current ring buffer producer and consumer positions */
 #define RING_BUFFER_COMPAT_SNAPSHOT		RING_BUFFER_SNAPSHOT
@@ -155,6 +158,9 @@ ssize_t vfs_lib_ring_buffer_splice_read(struct file *in, loff_t *ppos,
 /* Flush the current sub-buffer, even if empty. */
 #define RING_BUFFER_COMPAT_FLUSH_EMPTY			\
 	RING_BUFFER_FLUSH_EMPTY
+/* Is metadata incomplete ? */
+#define RING_BUFFER_COMPAT_METADATA_INCOMPLETE		\
+	RING_BUFFER_METADATA_INCOMPLETE
 #endif /* CONFIG_COMPAT */
 
 #endif /* _LIB_RING_BUFFER_VFS_H */

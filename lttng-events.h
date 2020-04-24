@@ -466,6 +466,7 @@ struct lttng_metadata_stream {
 	struct list_head list;		/* Stream list */
 	struct lttng_transport *transport;
 	uint64_t version;		/* Current version of the metadata cache */
+	bool incomplete;		/* Metadata is incomplete (invalid until continued) */
 };
 
 #define LTTNG_DYNAMIC_LEN_STACK_SIZE	128
@@ -516,6 +517,7 @@ struct lttng_metadata_cache {
 	char *data;			/* Metadata cache */
 	unsigned int cache_alloc;	/* Metadata allocated size (bytes) */
 	unsigned int metadata_written;	/* Number of bytes written in metadata cache */
+	int producing;			/* Metadata being produced (incomplete) */
 	struct kref refcount;		/* Metadata cache usage */
 	struct list_head metadata_stream;	/* Metadata stream list */
 	uuid_le uuid;			/* Trace session unique ID (copy) */

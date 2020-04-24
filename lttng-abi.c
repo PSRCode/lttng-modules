@@ -647,6 +647,18 @@ void lttng_metadata_ring_buffer_ioctl_put_next_subbuf(struct file *filp,
 }
 
 static
+int lttng_metadata_incomplete(struct lttng_metadata_stream *stream)
+{
+	struct lttng_metadata_cache *cache = stream->metadata_cache;
+	int ret;
+
+	mutex_lock(&cache->lock);
+	ret = stream->incomplete;
+	mutex_unlock(&cache->lock);
+	return ret;
+}
+
+static
 long lttng_metadata_ring_buffer_ioctl(struct file *filp,
 		unsigned int cmd, unsigned long arg)
 {
@@ -697,6 +709,12 @@ long lttng_metadata_ring_buffer_ioctl(struct file *filp,
 		struct lttng_metadata_stream *stream = filp->private_data;
 
 		return put_u64(stream->version, arg);
+	}
+	case RING_BUFFER_METADATA_INCOMPLETE:
+	{
+		struct lttng_metadata_stream *stream = filp->private_data;
+
+		return lttng_metadata_incomplete(stream);
 	}
 	default:
 		break;
@@ -774,6 +792,12 @@ long lttng_metadata_ring_buffer_compat_ioctl(struct file *filp,
 		struct lttng_metadata_stream *stream = filp->private_data;
 
 		return put_u64(stream->version, arg);
+	}
+	case RING_BUFFER_METADATA_INCOMPLETE:
+	{
+		struct lttng_metadata_stream *stream = filp->private_data;
+
+		return lttng_metadata_incomplete(stream);
 	}
 	default:
 		break;
@@ -958,6 +982,8 @@ int lttng_abi_open_metadata_stream(struct file *channel_file)
 	metadata_stream->priv = buf;
 	stream_priv = metadata_stream;
 	metadata_stream->transport = channel->transport;
+	/* Initial state is an empty metadata, considered as incomplete. */
+	metadata_stream->incomplete = true;
 
 	/*
 	 * Since life-time of metadata cache differs from that of
