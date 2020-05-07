@@ -72,6 +72,7 @@ static const struct file_operations lttng_event_fops;
 static struct file_operations lttng_stream_ring_buffer_file_operations;
 
 static int put_u64(uint64_t val, unsigned long arg);
+static int put_u32(uint32_t val, unsigned long arg);
 
 /*
  * Teardown management: opened file descriptors keep a refcount on the module,
@@ -647,24 +648,19 @@ void lttng_metadata_ring_buffer_ioctl_put_next_subbuf(struct file *filp,
 }
 
 static
-int lttng_metadata_incomplete(struct lttng_metadata_stream *stream)
-{
-	struct lttng_metadata_cache *cache = stream->metadata_cache;
-	int ret;
-
-	mutex_lock(&cache->lock);
-	ret = stream->incomplete;
-	mutex_unlock(&cache->lock);
-	return ret;
-}
-
-static
 long lttng_metadata_ring_buffer_ioctl(struct file *filp,
 		unsigned int cmd, unsigned long arg)
 {
 	int ret;
 	struct lttng_metadata_stream *stream = filp->private_data;
 	struct lib_ring_buffer *buf = stream->priv;
+	unsigned int rb_cmd;
+	bool coherent;
+
+	if (cmd == RING_BUFFER_GET_NEXT_SUBBUF_METADATA_CHECK)
+		rb_cmd = RING_BUFFER_GET_NEXT_SUBBUF;
+	else
+		rb_cmd = cmd;
 
 	switch (cmd) {
 	case RING_BUFFER_GET_NEXT_SUBBUF:
@@ -673,7 +669,7 @@ long lttng_metadata_ring_buffer_ioctl(struct file *filp,
 		struct lib_ring_buffer *buf = stream->priv;
 		struct channel *chan = buf->backend.chan;
 
-		ret = lttng_metadata_output_channel(stream, chan);
+		ret = lttng_metadata_output_channel(stream, chan, NULL);
 		if (ret > 0) {
 			lib_ring_buffer_switch_slow(buf, SWITCH_ACTIVE);
 			ret = 0;
@@ -699,7 +695,7 @@ long lttng_metadata_ring_buffer_ioctl(struct file *filp,
 		 * Before doing the actual ring buffer flush, write up to one
 		 * packet of metadata in the ring buffer.
 		 */
-		ret = lttng_metadata_output_channel(stream, chan);
+		ret = lttng_metadata_output_channel(stream, chan, NULL);
 		if (ret < 0)
 			goto err;
 		break;
@@ -710,11 +706,20 @@ long lttng_metadata_ring_buffer_ioctl(struct file *filp,
 
 		return put_u64(stream->version, arg);
 	}
-	case RING_BUFFER_METADATA_INCOMPLETE:
+	case RING_BUFFER_GET_NEXT_SUBBUF_METADATA_CHECK:
 	{
 		struct lttng_metadata_stream *stream = filp->private_data;
+		struct lib_ring_buffer *buf = stream->priv;
+		struct channel *chan = buf->backend.chan;
 
-		return lttng_metadata_incomplete(stream);
+		ret = lttng_metadata_output_channel(stream, chan, &coherent);
+		if (ret > 0) {
+			lib_ring_buffer_switch_slow(buf, SWITCH_ACTIVE);
+			ret = 0;
+		} else if (ret < 0) {
+			goto err;
+		}
+		break;
 	}
 	default:
 		break;
@@ -722,7 +727,7 @@ long lttng_metadata_ring_buffer_ioctl(struct file *filp,
 	/* PUT_SUBBUF is the one from lib ring buffer, unmodified. */
 
 	/* Performing lib ring buffer ioctl after our own. */
-	ret = lib_ring_buffer_ioctl(filp, cmd, arg, buf);
+	ret = lib_ring_buffer_ioctl(filp, rb_cmd, arg, buf);
 	if (ret < 0)
 		goto err;
 
@@ -732,6 +737,10 @@ long lttng_metadata_ring_buffer_ioctl(struct file *filp,
 		lttng_metadata_ring_buffer_ioctl_put_next_subbuf(filp,
 				cmd, arg);
 		break;
+	}
+	case RING_BUFFER_GET_NEXT_SUBBUF_METADATA_CHECK:
+	{
+		return put_u32(coherent, arg);
 	}
 	default:
 		break;
@@ -748,6 +757,13 @@ long lttng_metadata_ring_buffer_compat_ioctl(struct file *filp,
 	int ret;
 	struct lttng_metadata_stream *stream = filp->private_data;
 	struct lib_ring_buffer *buf = stream->priv;
+	unsigned int rb_cmd;
+	bool coherent;
+
+	if (cmd == RING_BUFFER_GET_NEXT_SUBBUF_METADATA_CHECK)
+		rb_cmd = RING_BUFFER_GET_NEXT_SUBBUF;
+	else
+		rb_cmd = cmd;
 
 	switch (cmd) {
 	case RING_BUFFER_GET_NEXT_SUBBUF:
@@ -756,7 +772,7 @@ long lttng_metadata_ring_buffer_compat_ioctl(struct file *filp,
 		struct lib_ring_buffer *buf = stream->priv;
 		struct channel *chan = buf->backend.chan;
 
-		ret = lttng_metadata_output_channel(stream, chan);
+		ret = lttng_metadata_output_channel(stream, chan, NULL);
 		if (ret > 0) {
 			lib_ring_buffer_switch_slow(buf, SWITCH_ACTIVE);
 			ret = 0;
@@ -782,7 +798,7 @@ long lttng_metadata_ring_buffer_compat_ioctl(struct file *filp,
 		 * Before doing the actual ring buffer flush, write up to one
 		 * packet of metadata in the ring buffer.
 		 */
-		ret = lttng_metadata_output_channel(stream, chan);
+		ret = lttng_metadata_output_channel(stream, chan, NULL);
 		if (ret < 0)
 			goto err;
 		break;
@@ -793,11 +809,20 @@ long lttng_metadata_ring_buffer_compat_ioctl(struct file *filp,
 
 		return put_u64(stream->version, arg);
 	}
-	case RING_BUFFER_METADATA_INCOMPLETE:
+	case RING_BUFFER_GET_NEXT_SUBBUF_METADATA_CHECK:
 	{
 		struct lttng_metadata_stream *stream = filp->private_data;
+		struct lib_ring_buffer *buf = stream->priv;
+		struct channel *chan = buf->backend.chan;
 
-		return lttng_metadata_incomplete(stream);
+		ret = lttng_metadata_output_channel(stream, chan, &coherent);
+		if (ret > 0) {
+			lib_ring_buffer_switch_slow(buf, SWITCH_ACTIVE);
+			ret = 0;
+		} else if (ret < 0) {
+			goto err;
+		}
+		break;
 	}
 	default:
 		break;
@@ -805,7 +830,7 @@ long lttng_metadata_ring_buffer_compat_ioctl(struct file *filp,
 	/* PUT_SUBBUF is the one from lib ring buffer, unmodified. */
 
 	/* Performing lib ring buffer ioctl after our own. */
-	ret = lib_ring_buffer_compat_ioctl(filp, cmd, arg, buf);
+	ret = lib_ring_buffer_compat_ioctl(filp, rb_cmd, arg, buf);
 	if (ret < 0)
 		goto err;
 
@@ -815,6 +840,10 @@ long lttng_metadata_ring_buffer_compat_ioctl(struct file *filp,
 		lttng_metadata_ring_buffer_ioctl_put_next_subbuf(filp,
 				cmd, arg);
 		break;
+	}
+	case RING_BUFFER_GET_NEXT_SUBBUF_METADATA_CHECK:
+	{
+		return put_u32(coherent, arg);
 	}
 	default:
 		break;
@@ -982,8 +1011,8 @@ int lttng_abi_open_metadata_stream(struct file *channel_file)
 	metadata_stream->priv = buf;
 	stream_priv = metadata_stream;
 	metadata_stream->transport = channel->transport;
-	/* Initial state is an empty metadata, considered as incomplete. */
-	metadata_stream->incomplete = true;
+	/* Initial state is an empty metadata, considered as incoherent. */
+	metadata_stream->coherent = false;
 
 	/*
 	 * Since life-time of metadata cache differs from that of
@@ -1501,6 +1530,11 @@ static const struct file_operations lttng_event_fops = {
 static int put_u64(uint64_t val, unsigned long arg)
 {
 	return put_user(val, (uint64_t __user *) arg);
+}
+
+static int put_u32(uint32_t val, unsigned long arg)
+{
+	return put_user(val, (uint32_t __user *) arg);
 }
 
 static long lttng_stream_ring_buffer_ioctl(struct file *filp,

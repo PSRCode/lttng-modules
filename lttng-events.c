@@ -1579,7 +1579,7 @@ void lttng_session_lazy_sync_enablers(struct lttng_session *session)
  * was written and a negative value on error.
  */
 int lttng_metadata_output_channel(struct lttng_metadata_stream *stream,
-		struct channel *chan)
+		struct channel *chan, bool *coherent)
 {
 	struct lib_ring_buffer_ctx ctx;
 	int ret = 0;
@@ -1612,17 +1612,13 @@ int lttng_metadata_output_channel(struct lttng_metadata_stream *stream,
 			len);
 	lib_ring_buffer_ctx_init(&ctx, chan, NULL, reserve_len,
 			sizeof(char), -1);
-	if (reserve_len < len || stream->metadata_cache->producing != 0) {
-		stream->incomplete = true;
-	} else {
-		stream->incomplete = false;
-	}
 	/*
 	 * If reservation failed, return an error to the caller.
 	 */
 	ret = stream->transport->ops.event_reserve(&ctx, 0);
 	if (ret != 0) {
 		printk(KERN_WARNING "LTTng: Metadata event reservation failed\n");
+		stream->coherent = false;
 		goto end;
 	}
 	stream->transport->ops.event_write(&ctx,
@@ -1630,9 +1626,14 @@ int lttng_metadata_output_channel(struct lttng_metadata_stream *stream,
 			reserve_len);
 	stream->transport->ops.event_commit(&ctx);
 	stream->metadata_in += reserve_len;
+	if (reserve_len < len || stream->metadata_cache->producing != 0)
+		stream->coherent = false;
+	else
+		stream->coherent = true;
 	ret = reserve_len;
 
 end:
+	*coherent = stream->coherent;
 	mutex_unlock(&stream->metadata_cache->lock);
 	return ret;
 }
