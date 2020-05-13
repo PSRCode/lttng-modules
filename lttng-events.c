@@ -1633,7 +1633,8 @@ int lttng_metadata_output_channel(struct lttng_metadata_stream *stream,
 	ret = reserve_len;
 
 end:
-	*coherent = stream->coherent;
+	if (coherent)
+		*coherent = stream->coherent;
 	mutex_unlock(&stream->metadata_cache->lock);
 	return ret;
 }
