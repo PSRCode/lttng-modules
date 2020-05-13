@@ -2498,10 +2498,11 @@ int _lttng_session_metadata_statedump(struct lttng_session *session)
 
 	if (!READ_ONCE(session->active))
 		return 0;
-	if (session->metadata_dumped)
-		goto skip_session;
 
 	lttng_metadata_begin(session);
+
+	if (session->metadata_dumped)
+		goto skip_session;
 
 	snprintf(uuid_s, sizeof(uuid_s),
 		"%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
